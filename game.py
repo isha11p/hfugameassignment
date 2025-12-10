@@ -13,13 +13,13 @@ SKILL_EVENTS = [
             "knowledge": 2,
             "social": 1,
             "energy": -1,
-            "message": "You join in, make some friends and understand the topic better. (+2 KNOW, +1 SOC, -1 NRG)"
+            "message": "You join in, make some friends and understand the topic better. (+2 KNOW, +1 SOC, -1 NRG)",
         },
         "on_failure": {
             "knowledge": -1,
             "social": 0,
             "energy": -1,
-            "message": "You feel too awkward to join and leave confused. (-1 KNOW, -1 NRG)"
+            "message": "You feel too awkward to join and leave confused. (-1 KNOW, -1 NRG)",
         },
     },
     {
@@ -30,13 +30,13 @@ SKILL_EVENTS = [
             "knowledge": 1,
             "social": 1,
             "energy": 0,
-            "message": "You join the discussion and clarify some concepts. (+1 KNOW, +1 SOC)"
+            "message": "You join the discussion and clarify some concepts. (+1 KNOW, +1 SOC)",
         },
         "on_failure": {
             "knowledge": 0,
             "social": -1,
             "energy": 0,
-            "message": "You try to join but cannot follow the discussion. (-1 SOC)"
+            "message": "You try to join but cannot follow the discussion. (-1 SOC)",
         },
     },
     {
@@ -47,30 +47,30 @@ SKILL_EVENTS = [
             "knowledge": 2,
             "social": 1,
             "energy": -2,
-            "message": "You both push through and cover a lot of material. (+2 KNOW, +1 SOC, -2 NRG)"
+            "message": "You both push through and cover a lot of material. (+2 KNOW, +1 SOC, -2 NRG)",
         },
         "on_failure": {
             "knowledge": -1,
             "social": 0,
             "energy": -2,
-            "message": "You are too tired, nothing sticks and you feel terrible. (-1 KNOW, -2 NRG)"
+            "message": "You are too tired, nothing sticks and you feel terrible. (-1 KNOW, -2 NRG)",
         },
     },
-     {
-        "id": "bullying_incident",
+    {
+        "id": "bully_event",
         "text": "A bully tries to steal your book in the hallway.",
         "requirements": {"energy": 3},
         "on_success": {
             "knowledge": 0,
             "social": 1,
             "energy": -1,
-            "message": "You stand up to the bully and keep your book. (+1 SOC, -1 NRG)"
+            "message": "You stand up to the bully and keep your book. (+1 SOC, -1 NRG)",
         },
         "on_failure": {
             "knowledge": -1,
             "social": -1,
             "energy": -2,
-            "message": "The bully intimidates you and takes your book. (-1 KNOW, -1 SOC,-2 NRG)"
+            "message": "The bully intimidates you and takes your book. (-1 KNOW, -1 SOC, -2 NRG)",
         },
     },
 ]
@@ -94,6 +94,27 @@ class Game:
         self.morning_actions_taken = 0
         self.selected = 0
         self.message = ""
+
+        # backgrounds for phases
+        self.phase_backgrounds = {
+            "morning": pygame.image.load("assets/images/phase_morning.png").convert(),
+            "day": pygame.image.load("assets/images/phase_day.png").convert(),
+            "evening": pygame.image.load("assets/images/phase_evening.png").convert(),
+            "exam_pass": pygame.image.load("assets/images/phase_exam_pass.png").convert(),
+            "exam_fail": pygame.image.load("assets/images/phase_exam_fail.png").convert(),
+        }
+
+        # backgrounds for events
+        self.event_backgrounds = {
+            "library_group": pygame.image.load("assets/images/event_library_group.png").convert(),
+            "cafeteria_chat": pygame.image.load("assets/images/event_cafeteria_chat.png").convert(),
+            "all_nighter_talk": pygame.image.load("assets/images/event_all_nighter_talk.png").convert(),
+            "bully_event": pygame.image.load("assets/images/event_bully_event.png").convert(),
+        }
+
+        # the current background shown in draw()
+        self.current_bg = self.phase_backgrounds["morning"]
+        print("Loaded bg:", self.current_bg)
 
     def update(self):
         pass
@@ -168,6 +189,7 @@ class Game:
         if self.morning_actions_taken >= 2:
             self.phase = "day"
             self.selected = 0
+            self.current_bg = self.phase_backgrounds["day"]
             self.trigger_random_event("morning_to_day")
             self.message += " Time to go to HFU."
 
@@ -177,7 +199,6 @@ class Game:
         moved_to_evening = False
 
         if label.startswith("Skip the day"):
-            self.phase = "evening"
             moved_to_evening = True
             self.message = "You took it easy today."
         elif "Attend class" in label and self.energy >= 2:
@@ -196,12 +217,13 @@ class Game:
 
         if self.energy <= 0:
             self.energy = 0
-            self.phase = "evening"
             moved_to_evening = True
             self.message += " You are exhausted and head home."
 
         if moved_to_evening:
+            self.phase = "evening"
             self.selected = 0
+            self.current_bg = self.phase_backgrounds["evening"]
             self.trigger_random_event("day_to_evening")
 
     def apply_evening_choice(self, index):
@@ -226,8 +248,13 @@ class Game:
         self.end_of_day()
 
     def trigger_random_event(self, transition_tag):
-        # one random skill-check event per transition
         event = random.choice(SKILL_EVENTS)
+
+        event_id = event.get("id")
+        bg = self.event_backgrounds.get(event_id)
+        if bg is not None:
+            self.current_bg = bg
+
         self.resolve_skill_event(event)
 
     def resolve_skill_event(self, event):
@@ -268,13 +295,16 @@ class Game:
             self.start_exam()
         else:
             self.phase = "morning"
+            self.current_bg = self.phase_backgrounds["morning"]
             self.message += " New day."
 
     def start_exam(self):
         self.phase = "exam"
         if self.knowledge >= 10:
+            self.current_bg = self.phase_backgrounds["exam_pass"]
             self.message = "Exam result: PASS. You survived the week at HFU. Press Enter to restart."
         else:
+            self.current_bg = self.phase_backgrounds["exam_fail"]
             self.message = "Exam result: FAIL. Not enough knowledge. Press Enter to restart."
         self.selected = 0
 
@@ -283,6 +313,7 @@ class Game:
             self.energy = MAX_ENERGY
         if self.energy < 0:
             self.energy = 0
+
     def draw_wrapped_text(self, text, x, y, max_width, color):
         if not text:
             return y
@@ -308,8 +339,16 @@ class Game:
         return y
 
     def draw(self):
+        # clear screen
         self.screen.fill((20, 20, 40))
 
+        # draw background image at the bottom of the screen
+        if self.current_bg is not None:
+            img_height = 250
+            img_scaled = pygame.transform.scale(self.current_bg, (800, img_height))
+            self.screen.blit(img_scaled, (0, 600 - img_height))
+
+        # header and stats at the top
         header = "Day {}/{} - Phase: {}".format(
             self.day, self.max_days, self.phase.capitalize()
         )
@@ -324,7 +363,7 @@ class Game:
 
         y = 90
         if self.message:
-             y = self.draw_wrapped_text(self.message, 20, y, 760, (200, 200, 0))
+            y = self.draw_wrapped_text(self.message, 20, y, 760, (200, 200, 0))
 
         if self.phase in ("exam", "game_over"):
             return
@@ -334,3 +373,4 @@ class Game:
             color = (255, 200, 200) if i == self.selected else (200, 200, 200)
             surf = self.font.render(label, True, color)
             self.screen.blit(surf, (40, y + i * 30))
+
