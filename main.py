@@ -2,9 +2,12 @@
 import pygame
 from game import Game
 
+PANEL_HEIGHT = 300
+IMAGE_HEIGHT = 600
+
 def main():
     pygame.init()
-    screen = pygame.display.set_mode((800, 600))
+    screen = pygame.display.set_mode((800, PANEL_HEIGHT + IMAGE_HEIGHT))
     pygame.display.set_caption("5 Days At HFU")
 
     game = Game(screen)

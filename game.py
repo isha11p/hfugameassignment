@@ -89,13 +89,11 @@ class Game:
         self.knowledge = 0
         self.energy = MAX_ENERGY
 
-        # phases: "morning", "day", "evening", "exam", "game_over"
         self.phase = "morning"
         self.morning_actions_taken = 0
         self.selected = 0
         self.message = ""
 
-        # backgrounds for phases
         self.phase_backgrounds = {
             "morning": pygame.image.load("assets/images/phase_morning.png").convert(),
             "day": pygame.image.load("assets/images/phase_day.png").convert(),
@@ -104,7 +102,6 @@ class Game:
             "exam_fail": pygame.image.load("assets/images/phase_exam_fail.png").convert(),
         }
 
-        # backgrounds for events
         self.event_backgrounds = {
             "library_group": pygame.image.load("assets/images/event_library_group.png").convert(),
             "cafeteria_chat": pygame.image.load("assets/images/event_cafeteria_chat.png").convert(),
@@ -112,9 +109,7 @@ class Game:
             "bully_event": pygame.image.load("assets/images/event_bully_event.png").convert(),
         }
 
-        # the current background shown in draw()
         self.current_bg = self.phase_backgrounds["morning"]
-        print("Loaded bg:", self.current_bg)
 
     def update(self):
         pass
@@ -127,13 +122,15 @@ class Game:
 
         if event.type == pygame.KEYDOWN:
             options = self.get_options()
+            if not options:
+                return
+
             if event.key == pygame.K_UP:
                 self.selected = max(0, self.selected - 1)
             elif event.key == pygame.K_DOWN:
                 self.selected = min(len(options) - 1, self.selected + 1)
             elif event.key == pygame.K_RETURN:
-                if options:
-                    self.apply_choice(self.selected)
+                self.apply_choice(self.selected)
 
     def get_options(self):
         if self.phase == "morning":
@@ -144,9 +141,7 @@ class Game:
                 "Go over notes (+1 KNOW)",
             ]
         elif self.phase == "day":
-            opts = [
-                "Skip the day (go to evening)",
-            ]
+            opts = ["Skip the day (go to evening)"]
             if self.energy >= 2:
                 opts.append("Attend class (-2 NRG, +2 KNOW, extra -1 NRG from focus)")
             if self.energy >= 1:
@@ -249,12 +244,10 @@ class Game:
 
     def trigger_random_event(self, transition_tag):
         event = random.choice(SKILL_EVENTS)
-
         event_id = event.get("id")
         bg = self.event_backgrounds.get(event_id)
         if bg is not None:
             self.current_bg = bg
-
         self.resolve_skill_event(event)
 
     def resolve_skill_event(self, event):
@@ -279,7 +272,6 @@ class Game:
         self.energy += outcome.get("energy", 0)
 
         self.clamp_stats()
-
         self.message = text + " " + outcome["message"]
 
     def end_of_day(self):
@@ -339,38 +331,46 @@ class Game:
         return y
 
     def draw(self):
-        # clear screen
-        self.screen.fill((20, 20, 40))
+        screen_w, screen_h = self.screen.get_size()
 
-        # draw background image at the bottom of the screen
+        panel_height = 260  # top UI area
+        img_height = screen_h - panel_height
+
+        # background (fallback)
+        self.screen.fill((0, 0, 0))
+
+        # draw stretched image under the panel (like your screenshot)
         if self.current_bg is not None:
-            img_height = 250
-            img_scaled = pygame.transform.scale(self.current_bg, (800, img_height))
-            self.screen.blit(img_scaled, (0, 600 - img_height))
+            img_stretched = pygame.transform.scale(self.current_bg, (screen_w, img_height))
+            self.screen.blit(img_stretched, (0, panel_height))
 
-        # header and stats at the top
+        # draw UI panel
+        pygame.draw.rect(self.screen, (15, 15, 40), pygame.Rect(0, 0, screen_w, panel_height))
+
         header = "Day {}/{} - Phase: {}".format(
             self.day, self.max_days, self.phase.capitalize()
         )
-        header_surface = self.big_font.render(header, True, (255, 255, 255))
-        self.screen.blit(header_surface, (20, 10))
+        header_surf = self.big_font.render(header, True, (255, 255, 255))
+        self.screen.blit(header_surf, (20, 10))
 
         stats = "SOC: {}  KNOW: {}  NRG: {}/{}".format(
             self.social, self.knowledge, self.energy, MAX_ENERGY
         )
-        stats_surface = self.font.render(stats, True, (220, 220, 220))
-        self.screen.blit(stats_surface, (20, 50))
+        stats_surf = self.font.render(stats, True, (255, 255, 255))
+        self.screen.blit(stats_surf, (20, 50))
 
         y = 90
         if self.message:
-            y = self.draw_wrapped_text(self.message, 20, y, 760, (200, 200, 0))
+            y = self.draw_wrapped_text(self.message, 20, y, screen_w - 40, (255, 255, 0))
+            # add spacing before options
+            y += 5
 
         if self.phase in ("exam", "game_over"):
             return
 
         options = self.get_options()
         for i, label in enumerate(options):
-            color = (255, 200, 200) if i == self.selected else (200, 200, 200)
+            color = (255, 200, 200) if i == self.selected else (255, 255, 255)
             surf = self.font.render(label, True, color)
             self.screen.blit(surf, (40, y + i * 30))
 
