@@ -3,7 +3,7 @@ import pygame
 from game import Game
 
 WINDOW_WIDTH = 800
-WINDOW_HEIGHT = 820  # 220 panel + 600 image
+WINDOW_HEIGHT = 900  # 220 panel + 600 image
 
 def show_start_screen(screen):
     clock = pygame.time.Clock()

@@ -89,11 +89,17 @@ class Game:
         self.knowledge = 0
         self.energy = MAX_ENERGY
 
+        # phases: "morning", "day", "evening", "event", "exam", "game_over"
         self.phase = "morning"
         self.morning_actions_taken = 0
         self.selected = 0
         self.message = ""
 
+        # event state
+        self.active_event = None
+        self.phase_after_event = None
+
+        # phase backgrounds
         self.phase_backgrounds = {
             "morning": pygame.image.load("assets/images/phase_morning.png").convert(),
             "day": pygame.image.load("assets/images/phase_day.png").convert(),
@@ -102,6 +108,7 @@ class Game:
             "exam_fail": pygame.image.load("assets/images/phase_exam_fail.png").convert(),
         }
 
+        # event backgrounds
         self.event_backgrounds = {
             "library_group": pygame.image.load("assets/images/event_library_group.png").convert(),
             "cafeteria_chat": pygame.image.load("assets/images/event_cafeteria_chat.png").convert(),
@@ -115,9 +122,16 @@ class Game:
         pass
 
     def handle_event(self, event):
+        # restart from exam screen
         if self.phase in ("exam", "game_over"):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                 self.__init__(self.screen)
+            return
+
+        # event phase: only Enter to continue
+        if self.phase == "event":
+            if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
+                self.finish_event()
             return
 
         if event.type == pygame.KEYDOWN:
@@ -154,6 +168,7 @@ class Game:
                 "Socialize (+2 SOC, -1 NRG)",
                 "Sleep early (+2 NRG)",
             ]
+        # no options in "event", "exam", "game_over"
         return []
 
     def apply_choice(self, index):
@@ -182,11 +197,9 @@ class Game:
 
         self.morning_actions_taken += 1
         if self.morning_actions_taken >= 2:
-            self.phase = "day"
-            self.selected = 0
-            self.current_bg = self.phase_backgrounds["day"]
-            self.trigger_random_event("morning_to_day")
-            self.message += " Time to go to HFU."
+            # morning -> event -> day
+            self.start_skill_event(next_phase="day")
+            self.morning_actions_taken = 0  # reset for next day
 
     def apply_day_choice(self, index):
         options = self.get_options()
@@ -216,10 +229,8 @@ class Game:
             self.message += " You are exhausted and head home."
 
         if moved_to_evening:
-            self.phase = "evening"
-            self.selected = 0
-            self.current_bg = self.phase_backgrounds["evening"]
-            self.trigger_random_event("day_to_evening")
+            # day -> event -> evening
+            self.start_skill_event(next_phase="evening")
 
     def apply_evening_choice(self, index):
         if index == 0:
@@ -242,13 +253,36 @@ class Game:
 
         self.end_of_day()
 
-    def trigger_random_event(self, transition_tag):
+    # event flow: morning -> event -> day, day -> event -> evening
+    def start_skill_event(self, next_phase):
         event = random.choice(SKILL_EVENTS)
+        self.active_event = event
+        self.phase_after_event = next_phase
+        self.phase = "event"
+
         event_id = event.get("id")
         bg = self.event_backgrounds.get(event_id)
         if bg is not None:
             self.current_bg = bg
+
+        # apply the skill check immediately, show result text
         self.resolve_skill_event(event)
+
+    def finish_event(self):
+        # return to the phase after event
+        if self.phase_after_event is None:
+            self.phase_after_event = "day"
+
+        self.phase = self.phase_after_event
+        self.phase_after_event = None
+        self.active_event = None
+
+        # set background back to phase background
+        if self.phase in self.phase_backgrounds:
+            self.current_bg = self.phase_backgrounds[self.phase]
+
+        # reset selection for new phase
+        self.selected = 0
 
     def resolve_skill_event(self, event):
         text = event["text"]
@@ -272,6 +306,7 @@ class Game:
         self.energy += outcome.get("energy", 0)
 
         self.clamp_stats()
+
         self.message = text + " " + outcome["message"]
 
     def end_of_day(self):
@@ -333,44 +368,52 @@ class Game:
     def draw(self):
         screen_w, screen_h = self.screen.get_size()
 
-        panel_height = 260  # top UI area
+        panel_height = 300
         img_height = screen_h - panel_height
 
-        # background (fallback)
+        # clear full screen
         self.screen.fill((0, 0, 0))
 
-        # draw stretched image under the panel (like your screenshot)
-        if self.current_bg is not None:
+        # draw image under the panel
+        if self.current_bg is not None and img_height > 0:
             img_stretched = pygame.transform.scale(self.current_bg, (screen_w, img_height))
             self.screen.blit(img_stretched, (0, panel_height))
 
-        # draw UI panel
+        # top panel
         pygame.draw.rect(self.screen, (15, 15, 40), pygame.Rect(0, 0, screen_w, panel_height))
 
-        header = "Day {}/{} - Phase: {}".format(
-            self.day, self.max_days, self.phase.capitalize()
-        )
+        # header
+        header = "Day {}/{} - Phase: {}".format(self.day, self.max_days, self.phase.capitalize())
         header_surf = self.big_font.render(header, True, (255, 255, 255))
         self.screen.blit(header_surf, (20, 10))
 
+        # stats
         stats = "SOC: {}  KNOW: {}  NRG: {}/{}".format(
             self.social, self.knowledge, self.energy, MAX_ENERGY
         )
         stats_surf = self.font.render(stats, True, (255, 255, 255))
         self.screen.blit(stats_surf, (20, 50))
 
-        y = 90
+        # message
+        y = 80
         if self.message:
             y = self.draw_wrapped_text(self.message, 20, y, screen_w - 40, (255, 255, 0))
-            # add spacing before options
-            y += 5
+            y += 20
 
+        # event screen: show prompt and return
+        if self.phase == "event":
+            prompt = "[Press Enter to continue]"
+            prompt_surf = self.font.render(prompt, True, (230, 230, 230))
+            self.screen.blit(prompt_surf, (20, y))
+            return
+
+        # exam / game_over: no options
         if self.phase in ("exam", "game_over"):
             return
 
+        # normal options
         options = self.get_options()
         for i, label in enumerate(options):
             color = (255, 200, 200) if i == self.selected else (255, 255, 255)
-            surf = self.font.render(label, True, color)
-            self.screen.blit(surf, (40, y + i * 30))
-
+            opt_surf = self.font.render(label, True, color)
+            self.screen.blit(opt_surf, (40, y + i * 30))
