@@ -327,7 +327,7 @@ class Game:
 
     def start_exam(self):
         self.phase = "exam"
-        if self.knowledge >= 25:
+        if self.knowledge >= 20:
             self.current_bg = self.phase_backgrounds["exam_pass"]
             self.message = "Exam result: PASS. You survived the week at HFU. Press Enter to restart."
         else:
