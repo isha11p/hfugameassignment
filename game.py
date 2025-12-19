@@ -122,13 +122,11 @@ class Game:
         pass
 
     def handle_event(self, event):
-        # restart from exam screen
         if self.phase in ("exam", "game_over"):
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                 self.__init__(self.screen)
             return
 
-        # event phase: only Enter to continue
         if self.phase == "event":
             if event.type == pygame.KEYDOWN and event.key == pygame.K_RETURN:
                 self.finish_event()
@@ -145,6 +143,7 @@ class Game:
                 self.selected = min(len(options) - 1, self.selected + 1)
             elif event.key == pygame.K_RETURN:
                 self.apply_choice(self.selected)
+   
 
     def get_options(self):
         if self.phase == "morning":
@@ -414,6 +413,9 @@ class Game:
         # normal options
         options = self.get_options()
         for i, label in enumerate(options):
+            prefix = "> " if i == self.selected else "  "
+            text = prefix + label
             color = (255, 200, 200) if i == self.selected else (255, 255, 255)
-            opt_surf = self.font.render(label, True, color)
+            opt_surf = self.font.render(text, True, color)
             self.screen.blit(opt_surf, (40, y + i * 30))
+

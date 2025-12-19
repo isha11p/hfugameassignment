@@ -84,7 +84,7 @@ def show_start_screen(screen):
 def main():
     pygame.init()
     screen = pygame.display.set_mode((WINDOW_WIDTH, WINDOW_HEIGHT))
-    pygame.display.set_caption("5 Days At HFU")
+    pygame.display.set_caption("5 Days At HFU Final Version")
 
     proceed = show_start_screen(screen)
     if not proceed:
